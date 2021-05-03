@@ -1,0 +1,16 @@
+[package]
+name = "aggregated_order_book"
+version = "0.1.0"
+authors = ["L3pereira <75404065+L3pereira@users.noreply.github.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[dev-dependencies]
+mockall = "0.9.1"
+pretty_assertions = "0.7.2"
+async-trait = "0.1.50"
+
+[dependencies]
+common = {path = "../common"}
+# gateway_in = {path = "../gateway_in"}
+rust_decimal = "1.10.3"

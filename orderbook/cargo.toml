@@ -2,6 +2,7 @@
 
 members = [
     "common",
+    "aggregated_order_book",
     "gateway_in",
     "app"  
 ]
