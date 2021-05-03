@@ -1,0 +1,16 @@
+{
+    "exchanges": {
+        "binance": {
+             "websocket_base_url": "wss://stream.binance.com:9443/stream",
+             "websocket_rate_ms": 100,
+             "symbols":["ETHBTC","LTCBTC","BNBBTC"],
+             "snapshot_depth": 10,
+             "snapshot_base_url":"https://api.binance.com/api/v3/depth"
+        },
+        "bitstamp": {
+            "websocket_base_url": "wss://ws.bitstamp.net",
+            "symbols":["ETHBTC","LTCBTC","BNBBTC"],
+            "snapshot_base_url":"https://www.bitstamp.net/api/v2/order_book"
+        }
+    }   
+}

@@ -1,0 +1,82 @@
+# Scan this file for changes every 30 seconds
+refresh_rate: 30 seconds
+
+appenders:
+  # An appender named "stdout" that writes to stdout
+  stdout:
+    kind: console
+    filters:
+      - kind: threshold
+        level: trace
+    encoder:
+      pattern: 
+      "\n{h(----------------------{l}----------------------)}\n
+        Time: {d(%Y-%m-%d %H:%M:%S.%f %Z)(utc)}\n
+        Thread name: {T}\n
+        Message: {m}\n"
+    
+  stderr:
+    kind: console
+    filters:
+      - kind: threshold
+        level: warn
+    encoder:
+      pattern: 
+      "\n{h(----------------------{l}----------------------)}\n
+        Time: {d(%Y-%m-%d %H:%M:%S.%f %Z)(utc)}\n
+        Thread name: {T}\n
+        Message: {m}\n"
+  # An appender named "log_file" that writes to a file with a custom pattern encoder
+  trace_appender:
+    kind: file
+    path: "../logs/trace.log"
+    filters:
+      - kind: threshold
+        level: trace
+    encoder:
+      pattern: 
+      "\n{h(----------------------{l}----------------------)}\n
+        Time: {d(%Y-%m-%d %H:%M:%S.%f %Z)(utc)}\n
+        Process id: {P}\n
+        Thread name: {T}\n
+        Thread id: {I}\n
+        Source File: {f}\n
+        Module: {M}\n
+        Line: {L}\n
+        Message: {m}\n"
+
+   # An appender named "log_file" that writes to a file with a custom pattern encoder
+  info_appender:
+    kind: file
+    path: "../logs/info.log"
+    filters:
+      - kind: threshold
+        level: info
+    encoder:
+      pattern: 
+      "\n{h(----------------------{l}----------------------)}\n
+        Time: {d(%Y-%m-%d %H:%M:%S.%f %Z)(utc)}\n
+        Process id: {P}\n
+        Thread name: {T}\n
+        Thread id: {I}\n
+        Source File: {f}\n
+        Module: {M}\n
+        Line: {L}\n
+        Message: {m}\n"       
+
+
+# Set the default logging level to "warn" and attach the "stdout" appender to the root
+root:
+  level: trace
+  appenders:
+    - stderr
+    - stdout
+    - trace_appender
+    - info_appender
+# loggers:
+#   # Raise The maximum log level for events sent to the "App::backend::d B" Lo Gger to ' info '
+#   gateway_in::<some_module>:
+#     level: trace
+#     appenders:
+#       - info
+#     additive: false
