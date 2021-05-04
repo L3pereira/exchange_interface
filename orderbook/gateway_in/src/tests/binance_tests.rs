@@ -16,14 +16,7 @@ use tokio::{
 use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
-use common::{
-    DepthData,
-    SnapshotData,
-    ErrorMessage,
-    Price,
-    Symbol,
-    Volume
-};
+use common::*;
 
 use crate::exchanges_services::binance::{
     BinanceConfig, deserialize_stream, deserialize_snapshot
@@ -113,6 +106,7 @@ fn deserialize_stream_binance_test(){
         Decimal::from_str("100").unwrap());
  
     let expected = DepthData {
+        exchange: Exchange::Binance,
         symbol: "bnbbtc".to_string(),
         first_update_id_timestamp: 157,
         last_update_id_timestamp: 160,
@@ -156,6 +150,7 @@ fn deserialize_snapshot_binance_test(){
         Decimal::from_str("39.45000000").unwrap());
  
     let expected = SnapshotData {
+        exchange: Exchange::Binance,
         symbol: "bnbbtc".to_string(),
         timestamp: 1833980193,
         bid_to_update: bid_to_update,
@@ -181,6 +176,7 @@ async fn stream_management_task_binance_test() {
             Decimal::from_str("0.01074300").unwrap(), 
             Decimal::from_str("5.74000000").unwrap());
         let data = DepthData {
+            exchange: Exchange::Binance,
             symbol: "bnbbtc".to_string(),
             first_update_id_timestamp: 1833980193,
             last_update_id_timestamp: 183398019344444,

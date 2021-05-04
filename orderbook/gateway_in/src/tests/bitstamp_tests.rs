@@ -16,14 +16,7 @@ use tokio::{
     sync::{oneshot, watch, broadcast, mpsc},
     time::{sleep, Duration}
 };
-use common::{
-    DepthData,
-    SnapshotData,
-    ErrorMessage,
-    Price,
-    Symbol,
-    Volume
-};
+use common::*;
 
 use crate::exchanges_services::bitstamp::{
     BitstampConfig, deserialize_stream, deserialize_snapshot
@@ -123,6 +116,7 @@ fn deserialize_stream_bitstamp_test(){
         Decimal::from_str("39.45000000").unwrap());
  
     let expected = DepthData {
+        exchange: Exchange::Bitstamp,
         symbol: "bnbbtc".to_string(),
         first_update_id_timestamp: 1833980193,
         last_update_id_timestamp: 1833980193555559,
@@ -167,6 +161,7 @@ fn deserialize_snapshot_bitstamp_test(){
         Decimal::from_str("39.45000000").unwrap());
  
     let expected = SnapshotData {
+        exchange: Exchange::Bitstamp,
         symbol: "bnbbtc".to_string(),
         timestamp: 1833980193054545,
         bid_to_update: bid_to_update,
@@ -192,6 +187,7 @@ async fn stream_management_task_bitstamp_test() {
                 Decimal::from_str("0.01074300").unwrap(), 
                 Decimal::from_str("5.74000000").unwrap());
             let data = DepthData {
+                exchange: Exchange::Bitstamp,
                 symbol: "ethbtc".to_string(),
                 first_update_id_timestamp: 1833980193,
                 last_update_id_timestamp: 1833980193555559,
