@@ -5,5 +5,5 @@ members = [
     "aggregated_order_book",
     "gateway_in",
     "orderbook_server", 
-    "client_orderbook"
+    "orderbook_client"
 ]

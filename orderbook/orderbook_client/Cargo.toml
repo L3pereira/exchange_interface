@@ -1,5 +1,5 @@
 [package]
-name = "client_orderbook"
+name = "orderbook_client"
 version = "0.1.0"
 authors = ["L3pereira <75404065+L3pereira@users.noreply.github.com>"]
 edition = "2018"
@@ -24,4 +24,3 @@ tonic = {version="0.4.3", features = ["tls"]}
 async-trait = "0.1.50"
 tokio-stream = { version = "0.1.5", features = ["sync"] }
 tokio-tungstenite = {version ="0.14.0", features = ["native-tls"] }
-druid = "0.7.0"
