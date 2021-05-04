@@ -9,6 +9,7 @@
 //     net::{TcpListener, TcpStream},
 //     sync::{oneshot, watch, broadcast, mpsc}
 // };
+use std::fmt;
 use std::{
     str::FromStr,
     collections::{BTreeMap}
@@ -54,6 +55,15 @@ impl FromStr for Exchange {
             "bitstamp"  => Ok(Exchange::Bitstamp),
             _      => Err(()),
         }
+    }
+}
+impl fmt::Display for Exchange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+       match *self {
+            Exchange::Binance => write!(f, "Binance"),
+            Exchange::Bitstamp => write!(f, "Bitstamp"),
+
+       }
     }
 }
 // #[derive(Clone, PartialEq, Eq, Display)]
