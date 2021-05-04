@@ -8,17 +8,7 @@ use rust_decimal::Decimal;
 use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
-use common::{
-    DepthData,
-    SnapshotData,
-    ErrorMessage,
-    Price,
-    Symbol,
-    Volume,
-    ErrCode,
-    ErrMsg,
-
-};
+use common::*;
 use tokio::{
     sync::{oneshot, watch, broadcast, mpsc},
     time::{sleep, Duration}
@@ -194,6 +184,7 @@ pub fn deserialize_stream(symbol: Symbol, mut json_str: String) -> Result<DepthD
         }
     }
     let depth_data = DepthData {
+        exchange: Exchange::Bitstamp,
         symbol: symbol,
         first_update_id_timestamp:timestamp,
         last_update_id_timestamp: micro_timestamp,
@@ -284,6 +275,7 @@ pub fn deserialize_snapshot(symbol: Symbol, mut json_str: String) -> Result<Snap
         }
     }
     let snapshot_data = SnapshotData {
+        exchange: Exchange::Bitstamp,
         symbol: symbol,
         timestamp: last_update_id,
         bid_to_update: bid_to_update_map,

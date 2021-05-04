@@ -12,16 +12,7 @@ use tokio::{
     sync::{oneshot, watch, broadcast, mpsc},
     time::{sleep, Duration}
 };
-use common::{
-    DepthData,
-    SnapshotData,
-    ErrorMessage,
-    Price,
-    Volume,
-    Symbol,
-    ErrCode,
-    ErrMsg
-};
+use common::*;
 
 use crate::settings::DeserializeSettings;
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -200,6 +191,7 @@ pub fn deserialize_stream(symbol: Symbol, mut json_str: String) -> Result<DepthD
         }
     }
     let depth_data = DepthData {
+        exchange: Exchange::Binance,
         symbol: symbol.to_string(),
         first_update_id_timestamp:first_update_id_timestamp,
         last_update_id_timestamp: last_update_id_timestamp,
@@ -293,6 +285,7 @@ pub fn deserialize_snapshot(symbol: Symbol, mut json_str: String) -> Result<Snap
         }
     }
     let snapshot_data = SnapshotData {
+        exchange: Exchange::Binance,
         symbol: symbol,
         timestamp: last_update_id,
         bid_to_update: bid_to_update_map,
@@ -325,7 +318,9 @@ pub async fn stream_management_task(mut settings: DeserializeSettings)
                     Message::Text(text_data) => {
         
                         match (settings.deserialize_fn)(settings.symbol.clone(), text_data) {
-                            Ok(depth_data) => {                 
+                            Ok(depth_data) => {     
+                                
+                                
                                 if let Err(err) = settings.output_tx_ch.send(depth_data) {
                                     log::error!("Error in {:?}:\nSending data:\n {:?}", task_name, err);
                                 }
@@ -355,3 +350,5 @@ pub async fn stream_management_task(mut settings: DeserializeSettings)
     }
     log::info!("{:?} End", task_name);   
 }
+
+
