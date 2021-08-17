@@ -11,7 +11,6 @@ tonic-build = "0.4.2"
 [dependencies]
 common = {path = "../common"}
 gateway_in = {path = "../gateway_in"}
-aggregated_order_book = {path = "../aggregated_order_book"}
 log = "0.4.13"
 log4rs = "1.0.0"
 url = "2.2.1"

@@ -1,18 +1,15 @@
 use common::{
     DepthData,
-    Symbol,
-    ErrorMessage
+    Symbol  
 };
 use tokio_tungstenite::{
     tungstenite::protocol::Message,
     tungstenite::error::Error as WsError
 };
-use tokio::{
-    sync::{mpsc, broadcast, watch}
-};
+use tokio::sync::{mpsc, broadcast};
 use futures_util::{
     stream::{SplitSink, SplitStream, Stream},
-    sink::{Sink}
+    sink::Sink
 };
 
 #[derive(Debug)]
@@ -62,7 +59,6 @@ pub struct DeserializeSettings
 
 {
     pub symbol: Symbol,
-    pub deserialize_fn: fn(String, Symbol)-> Result<DepthData, ErrorMessage>,
     pub input_rx_ch: broadcast::Receiver<Message>, 
     pub output_tx_ch: broadcast::Sender<DepthData>, 
     pub writer_tx_ch: mpsc::Sender<Message>
@@ -72,12 +68,11 @@ impl DeserializeSettings
 
     pub fn new( 
         symbol: Symbol,
-        deserialize_fn: fn(String, Symbol)-> Result<DepthData, ErrorMessage> , 
-        input_rx_ch: broadcast::Receiver<Message>, output_tx_ch: broadcast::Sender<DepthData>, 
+        input_rx_ch: broadcast::Receiver<Message>, 
+        output_tx_ch: broadcast::Sender<DepthData>, 
         writer_tx_ch: mpsc::Sender<Message>) -> Self {
             DeserializeSettings{
                 symbol: symbol,
-                deserialize_fn: deserialize_fn,
                 input_rx_ch: input_rx_ch, 
                 output_tx_ch: output_tx_ch, 
                 writer_tx_ch: writer_tx_ch

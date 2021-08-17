@@ -1,25 +1,22 @@
 
 use std::{
-    str::FromStr,
-    collections::{BTreeMap, VecDeque, HashMap}
+    collections::{BTreeMap, HashMap}
 };
+use anyhow::{Context, Result};
+use futures_util::StreamExt;
 use url::Url;
-use rust_decimal::Decimal;
 use tokio_tungstenite::{
+    connect_async, 
     tungstenite::protocol::Message,
 };
+use tokio::sync::{broadcast, mpsc};
+use serde::{Deserialize, Deserializer};
+use async_trait::async_trait;
 use common::*;
-use tokio::{
-    sync::{oneshot, watch, broadcast, mpsc},
-    time::{sleep, Duration}
-};
+use crate::*;
 use crate::settings::DeserializeSettings;
+use crate::exchanges_services::*;
 
-
-pub enum BitstampResponse{
-    SubscriptionSuceeded
-
-}
 
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -30,321 +27,274 @@ pub struct BitstampConfig{
     pub symbols: Vec<String>
 }
 impl BitstampConfig {
-    pub fn new(mut json_str: String) -> Result<Self, ErrorMessage>{
-        use serde_json::{Value, Map};
-        let json : Value = serde_json::from_str(&mut json_str)
-                .map_err(|e| ErrorMessage::new(200, format!("JSON was not well-formatted {:?}", e)))?;
+    pub fn new(json_str: String) -> Result<Self>{
 
-        match json["exchanges"]["bitstamp"].as_object(){
-            Some(value) => value,
-            _ => return Err(ErrorMessage::new(201, "exchanges was not well-formatted".to_string()))
-        };
+        let config: BitstampConfig = serde_json::from_str(&json_str)
+            .context("JSON was not well-formatted config bitstamp")?;
 
-        //println!("{:?}",bitstamp["websocket_base_"]);
-        let websocket_base_url: &str = match json["exchanges"]["bitstamp"]["websocket_base_url"].as_str(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(202, "bitstamp websocket_base_url was not well-formatted".to_string()))
-        };
-
-        let snapshot_base_url: &str = match json["exchanges"]["bitstamp"]["snapshot_base_url"].as_str(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(205, "bitstamp snapshot_base_url was not well-formatted".to_string()))
-        };
-   
-        let symbols: Vec<Value> = match json["exchanges"]["bitstamp"]["symbols"].as_array(){
-            Some(value) =>  value.to_vec(),
-            None => return Err(ErrorMessage::new(206, "bitstamp symbols was not well-formatted".to_string()))
-        };
-        let mut symbols_str :Vec<Symbol> = Vec::new();
-        let mut snapshot_hashmap: HashMap<Symbol, Url> = HashMap::new();
-        let mut websocket_payloads: HashMap<Symbol, Message> = HashMap::new();
-        let snapshot_base_url: Url = match Url::parse(snapshot_base_url) {
-            Ok(value) =>  value,
-            Err(err) => return Err(ErrorMessage::new(207, format!("bitstamp url parse error: {}", err)))
-        };
-        let path = snapshot_base_url.path();
-        for symbol in symbols.into_iter(){
-            let symbol =  match symbol.as_str(){
-                Some(value) => {
-                    let mut new_snapshot_url = snapshot_base_url.clone();
-                    new_snapshot_url.set_path(value);
-                    new_snapshot_url.set_path(&format!("{}/{}", path, value));
-                    snapshot_hashmap.insert(value.to_string(), new_snapshot_url);
-
-                    let payload_message =  format!("{{\"event\": \"bts:subscribe\", \"data\": {{ \"channel\": \"order_book_{}\" }} }}", value);
-                    websocket_payloads.insert(value.to_string(), Message::Text(payload_message)); 
-                    value
-                },
-                None => return Err(ErrorMessage::new(208, "bitstamp symbol was not well-formatted".to_string()))
-            };
-            symbols_str.push(symbol.to_string());
-        }
- 
-
-        let websocket_base_url: Url = match Url::parse(websocket_base_url) {
-            Ok(value) =>  value,
-            Err(err) => return Err(ErrorMessage::new(209, format!("binance url parse error: {}", err)))
-        };
-
-        let config = BitstampConfig{
-            websocket_url: websocket_base_url,
-            websocket_payloads: websocket_payloads,
-            snapshot_urls: snapshot_hashmap,
-            symbols: symbols_str
-
-        };
         Ok(config)
+
     } 
 }
 
-pub fn deserialize_stream(symbol: Symbol, mut json_str: String) -> Result<DepthData, ErrorMessage>{
-    let json : serde_json::Value = serde_json::from_str(&mut json_str)
-    .map_err(|e| ErrorMessage::new(100, format!("JSON was not well-formatted {}", e)))?;
+impl<'de> Deserialize<'de> for BitstampConfig {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let outter_config: OutterConfig = Deserialize::deserialize(deserializer)?;
 
-    let mut bid_to_update_map : BTreeMap<Price, Volume>= BTreeMap::new();
-    let mut ask_to_update_map : BTreeMap<Price, Volume>= BTreeMap::new();
+        let bitstamp_config = outter_config.exchanges.bitstamp;
 
+        let mut snapshot_hashmap: HashMap<Symbol, Url> = HashMap::new();
+        let mut websocket_payloads: HashMap<Symbol, Message> = HashMap::new();
 
-    let micro_timestamp: u64 = match json["data"]["microtimestamp"].as_str(){
-        Some(value) =>  value.parse::<u64>().map_err(|_| ErrorMessage::new(1022, "microtimestamp was not well-formatted".to_string()))?,
-        None => return Err(ErrorMessage::new(102, "microtimestamp was not well-formatted".to_string()))
-    };
+        
+        let path = bitstamp_config.snapshot_base_url.path();
+        for symbol in bitstamp_config.symbols.iter(){
+            let mut new_snapshot_url = bitstamp_config.snapshot_base_url.clone();
+            new_snapshot_url.set_path(symbol);
+            new_snapshot_url.set_path(&format!("{}/{}", path, symbol));
+            snapshot_hashmap.insert(symbol.clone(), new_snapshot_url);
 
-    let timestamp = match json["data"]["timestamp"].as_str(){
-        Some(value) =>  value.parse::<u64>().map_err(|_| ErrorMessage::new(1033, "timestamp was not well-formatted".to_string()))?,
-        None => return Err(ErrorMessage::new(103, "timestamp was not well-formatted".to_string()))
-    };
-
-
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    let ask_to_update_array = match json["data"]["asks"].as_array(){
-        Some(value) =>  value,
-        None => return Err(ErrorMessage::new(104, "asks was not well-formatted".to_string()))
-    };
-
-    for ask in ask_to_update_array{
-
-        let ask = match ask.as_array(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(105, "asks was not well-formatted".to_string()))
-        };
-
-        if ask.len() != 2 {
-            return Err(ErrorMessage::new(106, "asks was not well-formatted (lack of price or volume)".to_string()))
+            let payload_message =  format!("{{\"event\": \"bts:subscribe\", \"data\": {{ \"channel\": \"order_book_{}\" }} }}", symbol);
+            websocket_payloads.insert(symbol.clone(), Message::Text(payload_message)); 
         }
-        else {
-
-            let price = match Decimal::from_str(ask[0].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(107, format!("asks price JSON was not well-formatted {}", err)))
-            };
-            let volume = match Decimal::from_str(ask[1].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(108, format!("asks volume JSON was not well-formatted {}", err)))
-            };
-
-            ask_to_update_map
-            .entry(price)
-            .or_insert(volume);
-
-        }
-    }
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
-    
-    let bid_to_update_array = match json["data"]["bids"].as_array(){
-        Some(value) =>  value,
-        None => return Err(ErrorMessage::new(109, "bids was not well-formatted".to_string()))
-    };
-
-    for bid in bid_to_update_array{
-        let bid = match bid.as_array(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(110, "bids was not well-formatted".to_string()))
-        };
-
-        if bid.len() != 2 {
-            return Err(ErrorMessage::new(111, "bid was not well-formatted (lack of price or volume)".to_string()))
-        }
-        else {
  
-            let price = match Decimal::from_str(bid[0].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(112, format!("price JSON was not well-formatted {}", err)))
-            };
-            let volume = match Decimal::from_str(bid[1].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(113, format!("volume JSON was not well-formatted {}", err)))
-            };
 
-            bid_to_update_map
-            .entry(price)
-            .or_insert(volume);
+        let config = BitstampConfig{
+            websocket_url: bitstamp_config.websocket_base_url,
+            websocket_payloads: websocket_payloads,
+            snapshot_urls: snapshot_hashmap,
+            symbols: bitstamp_config.symbols
 
-        }
+        };
+        Ok(config)
+
     }
-    let depth_data = DepthData {
-        exchange: Exchange::Bitstamp,
-        symbol: symbol,
-        first_update_id_timestamp:timestamp,
-        last_update_id_timestamp: micro_timestamp,
-        bid_to_update: bid_to_update_map,
-        ask_to_update: ask_to_update_map
-    };
-
-    Ok(depth_data)
 }
 
-pub fn deserialize_snapshot(symbol: Symbol, mut json_str: String) -> Result<SnapshotData, ErrorMessage>{
-    let json : serde_json::Value = serde_json::from_str(&mut json_str)
-    .map_err(|e| ErrorMessage::new(300, format!("JSON was not well-formatted {}", e)))?;
-
-    let mut bid_to_update_map : BTreeMap<Price, Volume>= BTreeMap::new();
-    let mut ask_to_update_map : BTreeMap<Price, Volume>= BTreeMap::new();
-
-
-    let last_update_id: u64 = match json["microtimestamp"].as_str(){
-        Some(value) =>  value.parse::<u64>().map_err(|_| ErrorMessage::new(3022, "microtimestamp was not well-formatted".to_string()))?,
-        None => return Err(ErrorMessage::new(302, "microtimestamp was not well-formatted".to_string()))
-    };
-    ///////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-    let ask_to_update_array = match json["asks"].as_array(){
-        Some(value) =>  value,
-        None => return Err(ErrorMessage::new(304, "asks were not well-formatted".to_string()))
-    };
-
-    for ask in ask_to_update_array{
-
-        let ask = match ask.as_array(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(305, "a was not well-formatted".to_string()))
-        };
-
-        if ask.len() != 2 {
-            return Err(ErrorMessage::new(306, "ask was not well-formatted (lack of price or volume)".to_string()))
-        }
-        else {
-
-            let price = match Decimal::from_str(ask[0].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(307, format!("ask price JSON was not well-formatted {}", err)))
-            };
-            let volume = match Decimal::from_str(ask[1].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(308, format!("ask volume JSON was not well-formatted {}", err)))
-            };
-
-            ask_to_update_map
-            .entry(price)
-            .or_insert(volume);
-
-        }
-    }
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////// 
-    
-    let bid_to_update_array = match json["bids"].as_array(){
-        Some(value) =>  value,
-        None => return Err(ErrorMessage::new(309, "bids was not well-formatted".to_string()))
-    };
-
-    for bid in bid_to_update_array{
-        let bid = match bid.as_array(){
-            Some(value) =>  value,
-            None => return Err(ErrorMessage::new(310, "bids was not well-formatted".to_string()))
-        };
-
-        if bid.len() != 2 {
-            return Err(ErrorMessage::new(311, "bid was not well-formatted (lack of price or volume)".to_string()))
-        }
-        else {
- 
-            let price = match Decimal::from_str(bid[0].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(312, format!("price JSON was not well-formatted {}", err)))
-            };
-            let volume = match Decimal::from_str(bid[1].as_str().unwrap_or("x")){
-                Ok(value) =>  value,
-                Err(err) =>  return Err(ErrorMessage::new(313, format!("volume JSON was not well-formatted {}", err)))
-            };
-
-            bid_to_update_map
-            .entry(price)
-            .or_insert(volume);
-
-        }
-    }
-    let snapshot_data = SnapshotData {
-        exchange: Exchange::Bitstamp,
-        symbol: symbol,
-        timestamp: last_update_id,
-        bid_to_update: bid_to_update_map,
-        ask_to_update: ask_to_update_map
-    };
-
-    Ok(snapshot_data)
+pub struct BitstampService{
+    pub config: BitstampConfig
 }
+impl BitstampService{
+    pub fn new(config: BitstampConfig) -> Self{
+        BitstampService{
+            config: config
+        }
+    }
+}
+#[async_trait]
+impl ExchangeInit for BitstampService{
+    async fn stream_init_task(&mut self, output_stream_tx_ch: Sender<SnapshotData>) -> Result<()> {
+        let task_name = "--Binance Stream Management Task--";
 
-pub async fn stream_management_task(mut settings: DeserializeSettings)
-  {
-    let task_name = "--Bitstamp Stream Management Task--";
-    log::info!("{:?} Init", task_name);
-    loop{
-        match settings.input_rx_ch.recv().await {
-            Ok(input_msg) => {
-                match input_msg {
-                    Message::Close(close_data) => log::warn!("Warning in {:?}:\n close message received:\n {:?}", task_name, close_data),
-                    Message::Ping(ping_data) => {
-                        let pong_msg = Message::Pong(ping_data);
-                        match settings.writer_tx_ch.send(pong_msg).await {
-                            Ok(_) => log::trace!("Trace in {:?}:\n Sent pong", task_name),
-                            Err(err) => log::error!("Error in {:?}:\n sending pong:\n {:?}", task_name, err)
-                        }
-                    },
-                    Message::Pong(pong_data) => log::warn!("Warning in {:?}:\n pong message received:\n {:?}", task_name, pong_data),
-                    Message::Text(mut text_data) => {
-                        let json: serde_json::Value = match serde_json::from_str(&mut text_data){
-                            Ok(json) => {
-                                
-                                let json: serde_json::Value = json;
-                                if let Some(value) = json["event"].as_str(){
-                                    if value == "bts:subscription_succeeded" {
-                                        log::info!("Info in {:?}:\n Subscription Succeeded", task_name);
-                                        continue;
-                                    }
-                                }
-                                json                       
-                            },
-                            Err(err) => {log::error!("Error in {:?}:\n Server response JSON was not well-formatted:\n {:?}", task_name, err); continue}
-                        };
+        let symbol = self.config.symbols.get(0)
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+        
+        let web_socket_url = self.config.websocket_url.clone();
 
-                        match (settings.deserialize_fn)(settings.symbol.clone(), text_data) {
-                            Ok(depth_data) => {                 
-                                if let Err(err) = settings.output_tx_ch.send(depth_data) {
-                                    log::error!("Error in {:?}:\n sending data:\n {:?}", task_name, err);
+        let snapshot_url = self.config.snapshot_urls.get(symbol)
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+
+        let websocket_payload_init = self.config.websocket_payloads.get(symbol)
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+
+        let (ws_stream, _) = connect_async(web_socket_url).await
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+
+        let (writer, reader) = ws_stream.split();
+
+        let (writer_tx_ch, writer_rx_ch): (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel(20);
+        
+        let writer_settings = WriterSettings::new(symbol.clone(), writer, writer_rx_ch);
+
+        tokio::spawn(writer_task(writer_settings));
+
+        let (reader_tx_ch, reader_rx_ch) = broadcast::channel(10);
+        let reader_settings = ReaderSettings::new(symbol.clone(), reader, reader_tx_ch);
+        tokio::spawn(reader_task(reader_settings));
+
+        writer_tx_ch.send(websocket_payload_init.clone()).await
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+
+        let (output_tx_ch, output_rx_ch) =  broadcast::channel(10);    
+        let deserialize_settings = DeserializeSettings::new(symbol.clone(), reader_rx_ch, output_tx_ch, writer_tx_ch);
+        tokio::spawn(<BitstampService as ExchangeService>::stream_management_task(deserialize_settings));
+        
+        <BitstampService as ExchangeService>::
+            snapshot_task(symbol.clone(), snapshot_url.clone(), output_rx_ch, output_stream_tx_ch).await?;
+        Ok(())
+    }
+}
+#[async_trait]
+impl ExchangeService for BitstampService{
+
+    async fn stream_management_task(mut deserialize_settings: DeserializeSettings) {
+
+        let task_name = "--Bitstamp Stream Management Task--";
+        log::info!("{:?} Init", task_name);
+        loop{
+            match <BitstampService as ExchangeService>::websocket_msg_process(&mut deserialize_settings).await {
+                Ok(_)=> continue,
+                Err(err) => {
+                    log::error!("{:?}", err);
+
+                    match &err.downcast_ref::<broadcast::error::RecvError>() {
+                        Some(err) => {
+                            match err {
+                                broadcast::error::RecvError::Lagged(x) => {
+                                    log::trace!("Trace in {:?}:\ninput_rx_ch lagged:\n{:?}\n", task_name, x); 
+                                    continue;
+                                },
+                                broadcast::error::RecvError::Closed => {
+                                    log::warn!("Warning in {:?}:\ninput_rx_ch closed:\n", task_name); 
+                                    break;
                                 }
-                            },
-                            Err(err) => log::error!("Error in {:?}:\n desirializing:\n {:?}", task_name, err)
-                        }
-                    },
-                    Message::Binary(_) => log::warn!("Warning in {:?}:\n binary data sent:\n", task_name)
+                    
+                            }
+                        },
+                        None =>  log::warn!("Warning in {:?}:\ninput_rx_ch closed:\n", task_name)
+                    };          
                 }
+            };
+        } 
+        log::info!("{:?} End", task_name);  
+    }
+
+    async fn websocket_msg_process(deserialize_settings: &mut DeserializeSettings) -> Result<()> {
+        let task_name = "--Bitstamp websocket_msg_process--";
+     
+        let input_msg = deserialize_settings.input_rx_ch.recv().await
+            .context(format!("Error in {:?}:\ninput_rx_ch:\n", task_name))?;
+            
+        log::trace!("{:?}:\nReceived message from reader\n{:?}", task_name, input_msg);
+
+        match input_msg {
+                
+            Message::Close(close_data) => log::warn!("Warning in {:?}:\nClose message received:\n {:?}", task_name, close_data),
+            Message::Ping(ping_data) => {
+                let pong_msg = Message::Pong(ping_data);
+
+                deserialize_settings.writer_tx_ch.send(pong_msg).await
+                    .context(format!("Error in {:?}:\nSending pong:\n", task_name))?;
+                log::trace!("Trace in {:?}:\nSent pong", task_name)
             },
-            Err(err) => {
-                match err {
-                    broadcast::error::RecvError::Lagged(x) => {
-                        log::trace!("Trace in {:?}:\n input_rx_ch lagged:\n {:?}\n", task_name, x); 
-                        continue;
-                    },
-                    broadcast::error::RecvError::Closed => {
-                        log::warn!("Warning in {:?}:\n input_rx_ch closed:\n", task_name); 
-                        break;
-                    }
-    
+            Message::Pong(pong_data) => log::warn!("Warning in {:?}:\nPong message received:\n {:?}", task_name, pong_data),
+            Message::Text(text_data) => {
+                // log::info!("text_data \n\n{:?}:\n", text_data);
+                if let Ok(outter) = serde_json::from_str::<OuterBitstampNoData>(&text_data){
+                    if outter.event == "bts:subscription_succeeded" {
+                        log::info!("Info in {:?}:\n Subscription Succeeded", task_name);
+                        return Ok(());
+                    } 
+   
                 }
-            }
-    
+                // let outter = serde_json::from_str::<OuterBitstamp2>(&text_data)
+                //     .context(format!("Error in {:?}:\nDesirializing:\n", task_name))?;
+                // if outter.event == "bts:subscription_succeeded" {
+                //     log::info!("Info in {:?}:\n Subscription Succeeded", task_name);
+                //     return Ok(());
+                // } 
+
+
+                let data = <BitstampService as ExchangeService>::deserialize_stream(text_data)
+                    .context(format!("Error in {:?}:\nDesirializing:\n", task_name))?;
+
+                deserialize_settings.output_tx_ch.send(data)
+                    .context(format!("Error in {:?}:\nSending data:\n", task_name))?;
+
+            },
+            Message::Binary(_) => log::warn!("Warning in {:?}: binary data sent:\n", task_name)
         }
+        Ok(())
+
     }
-    log::info!("{:?} End", task_name);   
+
+    async fn snapshot_task(
+        _: Symbol, 
+        _: Url, 
+        mut output_rx_ch: Receiver<DepthData>, 
+        output_stream_tx_ch: Sender<SnapshotData>) -> Result<()> {
+
+        while let Ok(message) = output_rx_ch.recv().await{
+ 
+            let snapshot_data = SnapshotData{
+                exchange: message.exchange,
+                symbol: message.symbol,
+                timestamp: message.last_update_id_timestamp,
+                bid_to_update: message.bid_to_update,
+                ask_to_update: message.ask_to_update
+            };
+            output_stream_tx_ch.send(snapshot_data)
+                .context("JSON was not well-formatted deserialize_snapshot binance")?;
+        }
+        Ok(())
+    }
+
+    fn deserialize_stream(json_str: String) -> Result<DepthData> {
+        let task_name = "--Bitstamp deserialize_stream Task--";
+        log::info!("bitstamp deserialize stream Init");
+    
+        let outer_bitstamp: OuterBitstamp = serde_json::from_str(&json_str)
+            .context(format!("Error in {:?}:\n", task_name))?;
+        
+        let mut bid_to_update : BTreeMap<Price, Volume>= BTreeMap::new();
+        let mut ask_to_update : BTreeMap<Price, Volume>= BTreeMap::new();
+    
+        for pair in outer_bitstamp.data.bid_to_update {
+            let price: Price = pair[0];
+            let volume: Volume = pair[1];
+            bid_to_update.insert(price, volume);
+        }
+        for pair in outer_bitstamp.data.ask_to_update {
+            let price: Price = pair[0];
+            let volume: Volume = pair[1];
+            ask_to_update.insert(price, volume);
+        }
+        let result = DepthData {    
+            exchange: Exchange::Bitstamp,
+            symbol: outer_bitstamp.symbol.replace( "order_book_", "").to_uppercase(),
+            first_update_id_timestamp: serde_json::from_str(&outer_bitstamp.data.first_update_id_timestamp)
+                .context(format!("Error in {:?}:\n", task_name))?,
+            last_update_id_timestamp: serde_json::from_str(&outer_bitstamp.data.last_update_id_timestamp)            
+                .context(format!("Error in {:?}:\n", task_name))?,
+            bid_to_update: bid_to_update,
+            ask_to_update: ask_to_update
+        };
+    
+        Ok(result)
+    }
+    
+    fn deserialize_snapshot(symbol: Symbol, json_str: String) -> Result<SnapshotData> {
+    
+        let outer_bitstamp_snapshot: OuterBitstampSnapshot = serde_json::from_str(&json_str)
+            .context("JSON was not well-formatted deserialize_snapshot bitstamp")?;
+    
+        let mut bid_to_update : BTreeMap<Price, Volume>= BTreeMap::new();
+        let mut ask_to_update : BTreeMap<Price, Volume>= BTreeMap::new();
+    
+        for pair in outer_bitstamp_snapshot.bid_to_update {
+            let price: Price = pair[0];
+            let volume: Volume = pair[1];
+            bid_to_update.insert(price, volume);
+        }
+        for pair in outer_bitstamp_snapshot.ask_to_update {
+            let price: Price = pair[0];
+            let volume: Volume = pair[1];
+            ask_to_update.insert(price, volume);
+        }
+    
+        let result = SnapshotData {
+            exchange: Exchange::Bitstamp,
+            symbol: symbol,
+            timestamp: serde_json::from_str(&outer_bitstamp_snapshot.micro_timestamp)
+                .context("timestamp JSON was not well-formatted deserialize_snapshot bitstamp")?,
+            bid_to_update: bid_to_update,
+            ask_to_update: ask_to_update
+        };
+    
+        Ok(result)
+    }
+
 }

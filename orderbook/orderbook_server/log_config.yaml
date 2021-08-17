@@ -82,12 +82,12 @@ loggers:
       - warn_appender
     additive: false
 
-  # gateway_in:
-  #   level: trace
-  #   appenders:
-  #     - stderr
-  #     - stdout
-  #     - trace_appender
-  #     - warn_appender
-  #   additive: false
+  gateway_in:
+    level: trace
+    appenders:
+      - stderr
+      - stdout
+      - trace_appender
+      - warn_appender
+    additive: false
 

@@ -11,10 +11,12 @@ edition = "2018"
 [build-dependencies]
 tonic-build = "0.4.2"
 
+[dev-dependencies]
+pretty_assertions = "0.7.2"
+
 [dependencies]
 common = {path = "../common"}
 gateway_in = {path = "../gateway_in"}
-aggregated_order_book = {path = "../aggregated_order_book"}
 log = "0.4.13"
 log4rs = "1.0.0"
 url = "2.2.1"
@@ -27,3 +29,4 @@ tonic = {version="0.4.3", features = ["tls"]}
 async-trait = "0.1.50"
 tokio-stream = { version = "0.1.5", features = ["sync"] }
 tokio-tungstenite = {version ="0.14.0", features = ["native-tls"] }
+anyhow = "1.0.42"

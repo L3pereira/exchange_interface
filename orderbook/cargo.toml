@@ -2,7 +2,6 @@
 
 members = [
     "common",
-    "aggregated_order_book",
     "gateway_in",
     "orderbook_server", 
     "orderbook_client"

@@ -1,46 +1,44 @@
-// use futures_util::{
-//     SinkExt, 
-//     StreamExt,
-//     stream::{SplitSink, SplitStream}
-// };
-// use tokio_tungstenite::{accept_async, client_async, connect_async, tungstenite::protocol::Message, WebSocketStream};
-// use tokio::{
-//     io::{AsyncRead, AsyncWrite},
-//     net::{TcpListener, TcpStream},
-//     sync::{oneshot, watch, broadcast, mpsc}
-// };
+#![deny(
+    //   missing_docs,
+      trivial_casts,
+      trivial_numeric_casts,
+      unsafe_code,
+      unused_import_braces,
+      unused_qualifications,
+      warnings
+  )]
+ 
+
+//! This crate provides common types for gateway_in crates and order_book_server
+
 use std::fmt;
 use std::{
     str::FromStr,
-    collections::{BTreeMap}
+    collections::BTreeMap
 };
-// use derive_more::{Display, Add, Sub, Mul, Div, Sum, Product};
+use anyhow::Result;
 use rust_decimal::Decimal;
 
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display, Add, Sub, Mul, Div, Sum)]
+
+
+/// ErrCode
 pub type ErrCode = i32 ;
-
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display)]
+/// ErrMsg
 pub type ErrMsg = String;
-
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display)]
+/// Tick Symbol of an intrument
 pub type Symbol = String;
-
-// #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display, Add, Sub, Mul, Div, Sum)]
+/// Price of the instrument
 pub type Price = Decimal;
-
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display, Add, Sub, Mul, Div, Sum)]
-pub type Volume = Decimal; 
-
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display, Add, Sub, Mul, Div, Sum)]
+/// Volume at level
+pub type Volume = Decimal;
+/// the moment in time when the data arrives
 pub type FirstUpdateIdTimestamp = u64;
-
-//#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Display, Add, Sub, Mul, Div, Sum)]
+/// A margin where the snapshot data is valid
 pub type LastUpdateIdTimestamp =u64 ;
-
+/// Timestamp
 pub type Timestamp = u64;
 
-
+/// Exchange
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Exchange {
      Binance, Bitstamp
@@ -57,7 +55,9 @@ impl FromStr for Exchange {
         }
     }
 }
+
 impl fmt::Display for Exchange {
+
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
        match *self {
             Exchange::Binance => write!(f, "Binance"),
@@ -66,8 +66,7 @@ impl fmt::Display for Exchange {
        }
     }
 }
-// #[derive(Clone, PartialEq, Eq, Display)]
-// #[display(fmt = "ErrorMessage {{code: {}, message: {} }}", code, message)]
+/// ErrorMessage
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ErrorMessage{
     pub code: ErrCode,
@@ -82,9 +81,7 @@ impl ErrorMessage{
     }
 }
 
- 
-// #[derive(Clone, Display)]
-// #[display(fmt = "DepthData {{}}")]
+/// DepthData
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DepthData {
     pub exchange: Exchange,
@@ -95,7 +92,7 @@ pub struct DepthData {
     pub ask_to_update: BTreeMap<Price, Volume>
 
 }
-
+ /// SnapshotData
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SnapshotData {
     pub exchange: Exchange, 
@@ -105,3 +102,4 @@ pub struct SnapshotData {
     pub ask_to_update: BTreeMap<Price, Volume>
 
 }
+

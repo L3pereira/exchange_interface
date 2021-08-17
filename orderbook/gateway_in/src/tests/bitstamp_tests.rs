@@ -1,27 +1,17 @@
 use std::{
     str::FromStr,
-    collections::{BTreeMap, VecDeque, HashMap},
-    sync::Once
-    //time::Duration
+    collections::{BTreeMap, HashMap}
 };
 use url::Url;
-
-use pretty_assertions::{assert_eq, assert_ne};
-use log::{debug, error, info, warn};
+use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
-use tokio_tungstenite::{
-    tungstenite::protocol::Message,
-};
-use tokio::{
-    sync::{oneshot, watch, broadcast, mpsc},
-    time::{sleep, Duration}
-};
+use tokio_tungstenite::tungstenite::protocol::Message;
+use tokio::sync::{broadcast, mpsc};
 use common::*;
-
-use crate::exchanges_services::bitstamp::{
-    BitstampConfig, deserialize_stream, deserialize_snapshot
+use crate::exchanges_services::{
+    bitstamp::*,
+    ExchangeService
 };
-
 use crate::settings::DeserializeSettings;
 
 #[test]
@@ -75,8 +65,8 @@ fn bitstamp_config_test(){
         symbols: vec!["ETHBTC".to_string(), "LTCBTC".to_string(), "BNBBTC".to_string()]
     };
 
-    let result= BitstampConfig::new(data.to_string());
-    assert_eq!(Ok(expected), result);
+    let result= BitstampConfig::new(data.to_string()).unwrap();
+    assert_eq!(expected, result);
 }
 
 #[test]
@@ -114,18 +104,18 @@ fn deserialize_stream_bitstamp_test(){
     ask_to_update.insert(
         Decimal::from_str("0.01074400").unwrap(), 
         Decimal::from_str("39.45000000").unwrap());
- 
+    let symbol = "ETHBTC".to_string();
     let expected = DepthData {
         exchange: Exchange::Bitstamp,
-        symbol: "bnbbtc".to_string(),
+        symbol: symbol.clone(),
         first_update_id_timestamp: 1833980193,
         last_update_id_timestamp: 1833980193555559,
         bid_to_update: bid_to_update,
         ask_to_update: ask_to_update  
      };
-    //  println!("{:?}", )
-    let result = deserialize_stream("bnbbtc".to_string(), data.to_string());
-    assert_eq!(Ok(expected), result);
+
+    let result = <BitstampService as ExchangeService>::deserialize_stream(data.to_string()).unwrap();
+    assert_eq!(expected, result);
 
 }
 
@@ -159,46 +149,25 @@ fn deserialize_snapshot_bitstamp_test(){
     ask_to_update.insert(
         Decimal::from_str("0.01074400").unwrap(), 
         Decimal::from_str("39.45000000").unwrap());
- 
+    let symbol = "BNBBTC".to_string();
     let expected = SnapshotData {
         exchange: Exchange::Bitstamp,
-        symbol: "bnbbtc".to_string(),
+        symbol: "BNBBTC".to_string(),
         timestamp: 1833980193054545,
         bid_to_update: bid_to_update,
         ask_to_update: ask_to_update
      };
- 
-    let result = deserialize_snapshot("bnbbtc".to_string(), data.to_string());
-    assert_eq!(Ok(expected), result);
+
+     
+    let result = <BitstampService as ExchangeService>::deserialize_snapshot(symbol.clone(), data.to_string()).unwrap();
+    assert_eq!(expected, result);
 
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn stream_management_task_bitstamp_test() {
     super::setup();
-    let deserialize_fn = |symbol: Symbol ,json: String| -> Result<DepthData, ErrorMessage> {
-
-            let mut bid_to_update: BTreeMap<Price, Volume> =  BTreeMap::new();
-            let mut ask_to_update: BTreeMap<Price, Volume> =  BTreeMap::new();
-            bid_to_update.insert(
-                Decimal::from_str("0.01074200").unwrap(), 
-                Decimal::from_str("0.60000000").unwrap());
-            ask_to_update.insert(
-                Decimal::from_str("0.01074300").unwrap(), 
-                Decimal::from_str("5.74000000").unwrap());
-            let data = DepthData {
-                exchange: Exchange::Bitstamp,
-                symbol: "ethbtc".to_string(),
-                first_update_id_timestamp: 1833980193,
-                last_update_id_timestamp: 1833980193555559,
-                bid_to_update: bid_to_update,
-                ask_to_update: ask_to_update         
-            };
-            Ok(data)
-        
-
-    };
-
+   
     let data =  r#"
     {   
         "event": "data",
@@ -214,20 +183,42 @@ async fn stream_management_task_bitstamp_test() {
             ]
         }
     }"#;
-    let (input_tx_ch, mut input_rx_ch) =  broadcast::channel(3);
-    let (output_tx_ch, mut output_rx_ch) =  broadcast::channel(3);
+    let symbol = "ETHBTC".to_string();
+    let (input_tx_ch, input_rx_ch) =  broadcast::channel(10);
     let (writer_tx_ch, mut writer_rx_ch): (mpsc::Sender<Message>, mpsc::Receiver<Message>) = mpsc::channel(20);
-    let settings = DeserializeSettings::new("ethbtc".to_string(), deserialize_fn, input_rx_ch, output_tx_ch, writer_tx_ch);
-    
-    tokio::spawn(crate::exchanges_services::bitstamp::stream_management_task(settings));
-    input_tx_ch.send(Message::Text("{\"event\":\"bts:subscription_succeeded\",\"channel\":\"order_book_ethbtc\",\"data\":{}}".to_string()));
-    input_tx_ch.send(Message::Text(data.to_string()));
-    input_tx_ch.send(Message::Ping(vec![1_u8, 2, 3]));
-    let result_data_serialized: DepthData = (deserialize_fn("ethbtc".to_string(), "".to_string())).unwrap();
+    let (output_tx_ch, mut output_rx_ch) =  broadcast::channel(10);
+    let deserialize_settings = DeserializeSettings::new(symbol.clone(), input_rx_ch, output_tx_ch, writer_tx_ch);
+      
+    tokio::task::spawn(async move {
+        <BitstampService as ExchangeService>::stream_management_task(deserialize_settings).await
+    });
+
+    input_tx_ch.send(Message::Text("{\"event\":\"bts:subscription_succeeded\",\"channel\":\"order_book_ethbtc\",\"data\":{}}".to_string())).ok();
+    input_tx_ch.send(Message::Text(data.to_string())).ok();
+    input_tx_ch.send(Message::Ping(vec![1_u8, 2, 3])).ok();
+
+
+    let mut bid_to_update: BTreeMap<Price, Volume> =  BTreeMap::new();
+    let mut ask_to_update: BTreeMap<Price, Volume> =  BTreeMap::new();
+
+    bid_to_update.insert(
+        Decimal::from_str("0.01074200").unwrap(), 
+        Decimal::from_str("0.60000000").unwrap());
+    ask_to_update.insert(
+        Decimal::from_str("0.01074300").unwrap(), 
+        Decimal::from_str("5.74000000").unwrap());
+    let expected = DepthData {
+        exchange: Exchange::Bitstamp,
+        symbol: symbol,
+        first_update_id_timestamp: 1833980193,
+        last_update_id_timestamp: 1833980193555559,
+        bid_to_update: bid_to_update,
+        ask_to_update: ask_to_update         
+    };
     // Deserialize Task Test        |      Deserialize Task        |     Deserialize Task Test
     //-->input_tx_ch-->Broadcast ch-->input_rx_ch --> output_tx_ch-->Broadcast ch-->output_rx_ch
     //  Deserialize Task |             |   Deserialize Task Test
     //-->writer_tx_ch ----> MPSC ch  --> writer_rx_ch
-    assert_eq!(output_rx_ch.recv().await, Ok(result_data_serialized));
+    assert_eq!(output_rx_ch.recv().await, Ok(expected));
     assert_eq!(writer_rx_ch.recv().await, Some(Message::Pong(vec![1_u8, 2, 3])));
 }
