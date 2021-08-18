@@ -12,5 +12,6 @@
             "symbols":["ethbtc","ltcbtc","bnbbtc"],
             "snapshot_base_url":"https://www.bitstamp.net/api/v2/order_book"
         }
-    }   
+    },
+    "server": "[::1]:50051" 
 }

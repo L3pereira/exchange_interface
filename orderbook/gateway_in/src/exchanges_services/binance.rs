@@ -190,40 +190,19 @@ impl ExchangeService for BinanceService{
         mut output_rx_ch: Receiver<DepthData>, 
         output_stream_tx_ch: Sender<SnapshotData>) -> Result<()> {
 
+        let task_name = "--Binance Snapshot Task Task--";
         let snapshot = get_snapshot(snapshot_url.clone()).await
-            .context("JSON was not well-formatted deserialize_snapshot binance")?;
+            .context(format!("Error in {:?}:\n({:?})get_snapshot:\n", task_name, 1))?;
 
         let mut snapshot_message = <BinanceService as ExchangeService>::
             deserialize_snapshot(symbol.clone(), snapshot)
-            .context("JSON was not well-formatted deserialize_snapshot binance")?;
+            .context(format!("Error in {:?}:\n({:?}) deserialize_snapshot:\n", task_name,1))?;
 
         let mut is_first_event = true;
         let mut previuos_event_last_timestamp:u64 = 0;
 
-        while let Ok(message) = output_rx_ch.recv().await{
-            if is_first_event && message.last_update_id_timestamp <= snapshot_message.timestamp {
-                continue;      
-            }
-            else if is_first_event && (message.first_update_id_timestamp <= (snapshot_message.timestamp + 1)) 
-                && (message.last_update_id_timestamp >= (snapshot_message.timestamp + 1)){             
-                is_first_event = false;
-                previuos_event_last_timestamp = message.last_update_id_timestamp;
-            }
-            else if is_first_event || message.first_update_id_timestamp != previuos_event_last_timestamp{
+        let update_book_func = |message: DepthData, snapshot_message: &mut SnapshotData| { 
 
-                let snapshot = get_snapshot(snapshot_url.clone()).await
-                    .context("JSON was not well-formatted deserialize_snapshot binance")?;
-
-                snapshot_message =  <BinanceService as ExchangeService>::
-                    deserialize_snapshot(symbol.clone(), snapshot)
-                    .context("JSON was not well-formatted deserialize_snapshot binance")?;
-
-                is_first_event = true;
-                continue;
-            }
-            // log::debug!("4\n\n{:?}-{:?}-{:?}\n\n", message.first_update_id_timestamp, 
-            // message.last_update_id_timestamp ,snapshot_message.timestamp);
-    
             for (price, volume) in message.ask_to_update.into_iter(){
                 if volume == Decimal::new(0,0) {
                     snapshot_message.ask_to_update.remove_entry(&price);           
@@ -232,6 +211,7 @@ impl ExchangeService for BinanceService{
                     snapshot_message.ask_to_update.entry(price).or_insert(volume);
                 }
             }
+
             for (price, volume) in message.bid_to_update.into_iter(){
                 if volume == Decimal::new(0,0) {
                     snapshot_message.bid_to_update.remove_entry(&price);           
@@ -240,8 +220,41 @@ impl ExchangeService for BinanceService{
                     snapshot_message.bid_to_update.entry(price).or_insert(volume);
                 }             
             }
+
             output_stream_tx_ch.send(snapshot_message.clone())
-                .context("JSON was not well-formatted deserialize_snapshot binance")?;
+        };
+
+        while let Ok(message) = output_rx_ch.recv().await{
+            if is_first_event && message.last_update_id_timestamp <= snapshot_message.timestamp {
+                continue;      
+            }
+            else if is_first_event && (message.first_update_id_timestamp <= (snapshot_message.timestamp + 1)) 
+                && (message.last_update_id_timestamp >= (snapshot_message.timestamp + 1)){
+
+                is_first_event = false;
+                previuos_event_last_timestamp = message.last_update_id_timestamp;
+
+                update_book_func(message, &mut snapshot_message)?;
+            }
+            else if !is_first_event && message.first_update_id_timestamp == (previuos_event_last_timestamp + 1){
+                update_book_func(message, &mut snapshot_message)?;
+            }
+            else{
+                let snapshot = get_snapshot(snapshot_url.clone()).await
+                    .context(format!("Error in {:?}:\n{:?})get_snapshot:\n", task_name, 2))?;
+
+                snapshot_message =  <BinanceService as ExchangeService>::
+                    deserialize_snapshot(symbol.clone(), snapshot)
+                        .context(format!("Error in {:?}:\n({:?}) deserialize_snapshot:\n", task_name, 2))?;
+
+                is_first_event = true;
+                continue;
+            }
+            // log::debug!("4\n\n{:?}-{:?}-{:?}\n\n", message.first_update_id_timestamp, 
+            // message.last_update_id_timestamp ,snapshot_message.timestamp);
+    
+
+
         }
         Ok(())
     }

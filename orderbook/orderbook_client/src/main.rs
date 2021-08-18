@@ -23,7 +23,20 @@ async fn main() ->Result<(), Box<dyn std::error::Error>>{
         for ask in data.asks.iter(){
             println!("{:?}|{:?}|{:?}", ask.price, ask.amount, ask.exchange);
         }
-        println!("\nSpread---------{:?}-------------\n", data.spread);
+        println!("\nSpread--------({:?})-------------\n", data.spread);
+        let bin_ask = data.asks.iter().filter_map(|x| if x.exchange == "Binance" {Some(x.price)}else{None}).rev().collect::<Vec<f64>>();
+        let bin_bid = data.bids.iter().filter_map(|x| if x.exchange == "Binance" {Some(x.price)}else{None}).rev().collect::<Vec<f64>>();
+        let bit_ask = data.asks.iter().filter_map(|x| if x.exchange == "Bitstamp" {Some(x.price)}else{None}).rev().collect::<Vec<f64>>();
+        let bit_bid = data.bids.iter().filter_map(|x| if x.exchange == "Bitstamp" {Some(x.price)}else{None}).rev().collect::<Vec<f64>>();
+        
+        if bin_ask.get(0).is_some() && bin_bid.get(0).is_some(){
+            let spread = bin_ask.get(0).unwrap() - bin_bid.get(0).unwrap();
+            println!("\nBin Spread--------({:?})----({:?})--({:?})-------\n",spread, bin_ask.get(0).unwrap(), bin_bid.get(0).unwrap());
+        }
+        if bit_ask.get(0).is_some() && bit_bid.get(0).is_some(){
+            let spread = bit_ask.get(0).unwrap() - bit_bid.get(0).unwrap();
+            println!("\nBit Spread--------({:?})----({:?})--({:?})-------\n",spread, bit_ask.get(0).unwrap(), bit_bid.get(0).unwrap());
+        }
         for bid in data.bids.iter().rev(){
             println!("{:?}|{:?}|{:?}", bid.price, bid.amount, bid.exchange);
         }
