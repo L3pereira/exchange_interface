@@ -1,18 +1,22 @@
 [package]
-name = "orderbook_client"
+name = "webserver"
 version = "0.1.0"
-authors = ["L3pereira <75404065+L3pereira@users.noreply.github.com>"]
 edition = "2018"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [build-dependencies]
 tonic-build = "0.4.2"
 
+
 [dependencies]
 common = {path = "../common"}
 gateway_in = {path = "../gateway_in"}
+actix-web = "3.3.2"
+actix-files = "0.5.0"
+actix-web-actors = "3.0.0"
+actix = "0.10.0"
 log = "0.4.13"
 log4rs = "1.0.0"
+env_logger = "0.8"
 url = "2.2.1"
 rust_decimal = "1.10.3"
 futures = "0.3"
@@ -23,5 +27,3 @@ tonic = {version="0.4.3", features = ["tls"]}
 async-trait = "0.1.50"
 tokio-stream = { version = "0.1.5", features = ["sync"] }
 tokio-tungstenite = {version ="0.14.0", features = ["native-tls"] }
-gtk = { version = "0.2", package = "gtk4" }
-# gtk = "0.14.0"
