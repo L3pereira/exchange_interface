@@ -1,8 +1,5 @@
 use url::Url;
-use std::{
-    sync::Once,
-    collections::HashMap
-};
+use std::collections::HashMap;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use crate::{
     ExchangesConfig,
@@ -10,18 +7,18 @@ use crate::{
     bitstamp_config_utils::*
 }; 
 
-static INIT: Once = Once::new();
-fn setup() -> () { 
-    INIT.call_once(|| {
-        const LOG_CONFIG_PATH: &str = "src/tests/log_config.yaml";
-        log4rs::init_file(LOG_CONFIG_PATH, Default::default()).unwrap();
-    });
-}
+// static INIT: Once = Once::new();
+// fn setup() -> () { 
+//     INIT.call_once(|| {
+//         const LOG_CONFIG_PATH: &str = "src/tests/log_config.yaml";
+//         log4rs::init_file(LOG_CONFIG_PATH, Default::default()).unwrap();
+//     });
+// }
 
 
 #[test]
 fn binance_config_test(){
-    setup();
+
     let data = r#"{
         "binance": {
             "websocket_base_url": "wss://stream.binance.com:9443/stream",
@@ -74,15 +71,16 @@ fn binance_config_test(){
         snapshot_depth: 10,
         symbols: vec!["ETHBTC".to_string(), "LTCBTC".to_string(), "BNBBTC".to_string()]
     };
-    let result: ExchangesConfig = serde_json::from_str(&data).unwrap();
-    // let result= BinanceConfig::new(data.to_string()).unwrap();
+
+    let result = serde_json::from_str::<ExchangesConfig>(&data).unwrap();
+
     assert_eq!(expected, result.binance);
 }
 
 
 #[test]
 fn bitstamp_config_test(){
-    setup();
+
     let data = r#"{
         "binance": {
             "websocket_base_url": "wss://stream.binance.com:9443/stream",
@@ -131,7 +129,7 @@ fn bitstamp_config_test(){
         snapshot_urls: snapshot_hashmap,
         symbols: vec!["ETHBTC".to_string(), "LTCBTC".to_string(), "BNBBTC".to_string()]
     };
-    let result: ExchangesConfig = serde_json::from_str(&data).unwrap();
+    let result = serde_json::from_str::<ExchangesConfig>(&data).unwrap();
  
     assert_eq!(expected, result.bitstamp);
 }
