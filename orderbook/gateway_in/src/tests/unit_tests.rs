@@ -8,8 +8,8 @@ use crate::settings::{ReaderSettings, WriterSettings};
 use super::mocks::MockWebSocketStream;
 
 #[tokio::test]
-async fn reader_task_test() {
-    super::setup();
+async fn test_reader_task() {
+    // super::setup();
     let (r_sender, r_receiver) = broadcast::channel(3);
     let (w_sender, _) = broadcast::channel(3);
     let _ = r_sender.send(Message::Text("Msg 1".to_string()));
@@ -28,8 +28,8 @@ async fn reader_task_test() {
     assert_eq!(input_rx_ch.recv().await, Ok(Message::Text("Msg 3".to_string())));
 }
 #[tokio::test]
-async fn writer_task_test() {
-    super::setup();
+async fn test_writer_task() {
+    // super::setup();
     
     let (_, r_receiver) =  broadcast::channel(3);
     let (w_sender, mut w_receiver)=  broadcast::channel(3); 

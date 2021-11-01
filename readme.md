@@ -7,8 +7,8 @@ Change the config.json
 
 To start receiving the quotes.<br>
 1 Open orderbook_server and enter "cargo run", the server will be listeneing<br>
-2 open client_orderbook and enter again "cargo run", the client makes one stream request.<br>
-3 the quotes will be shown at the console.
+2 open webserver and enter again "cargo run".<br>
+3 open your browser and enter "127.0.0.1:8080" or whatever the ip you choose on config.json
 
 When you run the server the OrderbookAggregator will start the all the exchanges tasks,<br> 
 and set up all the channels. the stream connection with binance can be done in one step <br>

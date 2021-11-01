@@ -22,7 +22,7 @@ use crate::settings::DeserializeSettings;
 
 
 #[test]
-fn deserialize_stream_binance_test(){
+fn test_deserialize_stream_binance(){
     // super::setup();
     let data =  r#"
     {        
@@ -60,8 +60,8 @@ fn deserialize_stream_binance_test(){
 }
 
 #[test]
-fn deserialize_snapshot_binance_test(){
-    super::setup();
+fn test_deserialize_snapshot_binance(){
+ 
     let data =  r#"{
         "lastUpdateId":1833980193,
         "bids":[
@@ -103,8 +103,8 @@ fn deserialize_snapshot_binance_test(){
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stream_management_task_binance_test() {
-    super::setup();
+async fn test_stream_management_task_binance() {
+
 
     let data = r#"{        
             "e": "depthUpdate",

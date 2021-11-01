@@ -1,12 +1,12 @@
-// #![deny(
-//     //  missing_docs, // not compatible with big_array
-//       trivial_casts,
-//       trivial_numeric_casts,
-//       unsafe_code,
-//       unused_import_braces,
-//       unused_qualifications,
-//       warnings
-//   )]
+#![deny(
+    //  missing_docs, // not compatible with big_array
+      trivial_casts,
+      trivial_numeric_casts,
+      unsafe_code,
+      unused_import_braces,
+      unused_qualifications,
+      warnings
+  )]
 mod actix_actors;
 mod orderbook;
 
@@ -60,9 +60,9 @@ async fn data_stream(mut stream: tonic::Streaming<Summary>, feed_actor_addr: Add
         let output_data = OutputData{
             summary: data
         };
-        // warn!("\n{:?}", output_data);
-        let res = feed_actor_addr.do_send(output_data);
-        // warn!("\nResult {:?}", res);
+
+        feed_actor_addr.do_send(output_data);
+      
     }
 
     Ok(())

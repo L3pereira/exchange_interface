@@ -142,30 +142,12 @@ where
 }
 
 pub fn setup_config(path: &str) -> Result<ExchangesConfig> {
-    // let task_name = "--setup_config--";
+  
     let mut file = File::open(path)?;
-    // let mut file = match File::open(path){
-    //     Ok(file) => file,
-    //     Err(err) => {
-    //         log::error!("Error in {:?}\nFile open:\n{:?}", task_name, err);
-    //         panic!("Error in {:?}\nFile open:\n{:?}", task_name, err)
-    //     }
-    // };
+
     let mut buff = String::new(); 
     file.read_to_string(&mut buff)?;
-    // if let Err(err) = file.read_to_string(&mut buff){
-    //     log::error!("Error in {:?}\nFile Read To String :\n{:?}", task_name, err);
-    //     panic!("Error in {:?}\nFile Read To String :\n{:?}", task_name, err)
 
-    // };
-
-    // let config = match WebAppConfig::new(buff){
-    //     Ok(config) => config,
-    //     Err(err) => {
-    //         log::error!("Error in {:?}\nDeserialize config :\n{:?}", task_name, err);
-    //         panic!("Error in {:?}\nDeserialize config :\n{:?}", task_name, err);
-    //     }
-    // };
     let config: ExchangesConfig = serde_json::from_str(&buff)
         .context("JSON was not well-formatted config binance")?;
 

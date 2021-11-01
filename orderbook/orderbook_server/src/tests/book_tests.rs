@@ -8,7 +8,7 @@ use rust_decimal::Decimal;
 use pretty_assertions::assert_eq;
 
 #[test]
-fn get_top_asks_aggregate_book_test() {
+fn test_get_top_asks_aggregate_book() {
 
     let mut asks_from_exchange_1: BTreeMap<Price, Volume> =  BTreeMap::new();
     let bids_from_exchange_1: BTreeMap<Price, Volume> =  BTreeMap::new();
@@ -66,7 +66,7 @@ fn get_top_asks_aggregate_book_test() {
 }
 
 #[test]
-fn  get_top_bids_aggregate_book_test() {
+fn  test_get_top_bids_aggregate_book() {
 
     let asks_from_exchange_1: BTreeMap<Price, Volume> =  BTreeMap::new();
     let mut bids_from_exchange_1: BTreeMap<Price, Volume> =  BTreeMap::new();

@@ -17,8 +17,8 @@ use crate::settings::DeserializeSettings;
 
 
 #[test]
-fn deserialize_stream_bitstamp_test(){
-    super::setup();
+fn test_deserialize_stream_bitstamp(){
+
     let data =  r#"
     {   
         "event": "data",
@@ -67,8 +67,8 @@ fn deserialize_stream_bitstamp_test(){
 }
 
 #[test]
-fn deserialize_snapshot_bitstamp_test(){
-    super::setup();
+fn test_deserialize_snapshot_bitstamp(){
+
     let data =  r#"{
         "microtimestamp":"1833980193054545",
         "timestamp":"1833980193",
@@ -112,8 +112,8 @@ fn deserialize_snapshot_bitstamp_test(){
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn stream_management_task_bitstamp_test() {
-    super::setup();
+async fn test_stream_management_task_bitstamp() {
+
    
     let data =  r#"
     {   
