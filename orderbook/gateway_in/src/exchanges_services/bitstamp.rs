@@ -1,7 +1,5 @@
 
-use std::{
-    collections::{BTreeMap, HashMap}
-};
+use std::collections::BTreeMap;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use url::Url;
@@ -10,69 +8,13 @@ use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
 use tokio::sync::{broadcast, mpsc};
-use serde::{Deserialize, Deserializer};
+
 use async_trait::async_trait;
 use common::*;
 use crate::*;
 use crate::settings::DeserializeSettings;
 use crate::exchanges_services::*;
 
-
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BitstampConfig{
-    pub websocket_url: Url,
-    pub websocket_payloads: HashMap<String, Message>,
-    pub snapshot_urls: HashMap<String, Url>,
-    pub symbols: Vec<String>
-}
-impl BitstampConfig {
-    pub fn new(json_str: String) -> Result<Self>{
-
-        let config: BitstampConfig = serde_json::from_str(&json_str)
-            .context("JSON was not well-formatted config bitstamp")?;
-
-        Ok(config)
-
-    } 
-}
-
-impl<'de> Deserialize<'de> for BitstampConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let outter_config: OutterConfig = Deserialize::deserialize(deserializer)?;
-
-        let bitstamp_config = outter_config.exchanges.bitstamp;
-
-        let mut snapshot_hashmap: HashMap<Symbol, Url> = HashMap::new();
-        let mut websocket_payloads: HashMap<Symbol, Message> = HashMap::new();
-
-        
-        let path = bitstamp_config.snapshot_base_url.path();
-        for symbol in bitstamp_config.symbols.iter(){
-            let mut new_snapshot_url = bitstamp_config.snapshot_base_url.clone();
-            new_snapshot_url.set_path(symbol);
-            new_snapshot_url.set_path(&format!("{}/{}", path, symbol));
-            snapshot_hashmap.insert(symbol.clone(), new_snapshot_url);
-
-            let payload_message =  format!("{{\"event\": \"bts:subscribe\", \"data\": {{ \"channel\": \"order_book_{}\" }} }}", symbol);
-            websocket_payloads.insert(symbol.clone(), Message::Text(payload_message)); 
-        }
- 
-
-        let config = BitstampConfig{
-            websocket_url: bitstamp_config.websocket_base_url,
-            websocket_payloads: websocket_payloads,
-            snapshot_urls: snapshot_hashmap,
-            symbols: bitstamp_config.symbols
-
-        };
-        Ok(config)
-
-    }
-}
 
 pub struct BitstampService{
     pub config: BitstampConfig

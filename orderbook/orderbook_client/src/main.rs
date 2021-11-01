@@ -13,7 +13,7 @@ use orderbook::orderbook_aggregator_client::{OrderbookAggregatorClient};
 #[tokio::main] 
 async fn main() ->Result<(), Box<dyn std::error::Error>>{
 
-    let mut client = OrderbookAggregatorClient::connect("http://[::1]:50051").await?;
+    let mut client = OrderbookAggregatorClient::connect("http://127.0.0.1:50051").await?;
 
     // let response = client.book_summary(Request::new(Empty)).await?;
     let mut stream = client.book_summary(Request::new(Empty{})).await?.into_inner();

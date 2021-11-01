@@ -29,7 +29,7 @@ appenders:
   # An appender named "log_file" that writes to a file with a custom pattern encoder
   trace_appender:
     kind: file
-    path: "../logs_orderbook_server/trace.log"
+    path: "../logs_webserver/trace.log"
     filters:
       - kind: threshold
         level: trace
@@ -48,7 +48,7 @@ appenders:
    # An appender named "log_file" that writes to a file with a custom pattern encoder
   warn_appender:
     kind: file
-    path: "../logs_orderbook_server/warn.log"
+    path: "../logs_webserver/warn.log"
     filters:
       - kind: threshold
         level: warn
@@ -72,22 +72,14 @@ root:
   #   - stderr
   #   - stdout
 loggers:
-  #Raise The maximum log level for events sent to the "App::backend::d B" Lo Gger to ' info '
-  orderbook_server:
-    level: trace
+  #Raise The maximum log level for events sent to the "App::backend::d B" Lo Gger to ' info '   
+  webserver:
+    level: warn
     appenders:
-      - stderr
+      # - stderr
       - stdout
-      - trace_appender
-      - warn_appender
+      # - trace_appender
+      # - warn_appender
     additive: false
-  
-  # gateway_in:
-  #   level: trace
-  #   appenders:
-  #     - stderr
-  #     - stdout
-  #     - trace_appender
-  #     - warn_appender
-  #   additive: false
+
 

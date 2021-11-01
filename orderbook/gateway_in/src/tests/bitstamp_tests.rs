@@ -1,8 +1,8 @@
 use std::{
     str::FromStr,
-    collections::{BTreeMap, HashMap}
+    collections::BTreeMap
 };
-use url::Url;
+
 use pretty_assertions::assert_eq;
 use rust_decimal::Decimal;
 use tokio_tungstenite::tungstenite::protocol::Message;
@@ -14,60 +14,7 @@ use crate::exchanges_services::{
 };
 use crate::settings::DeserializeSettings;
 
-#[test]
-fn bitstamp_config_test(){
-    super::setup();
-    let data = r#"{
-        "exchanges": {
-            "binance": {
-                 "websocket_base_url": "wss://stream.binance.com:9443/stream",
-                 "websocket_rate_ms": 100,
-                 "symbols":["ETHBTC","LTCBTC","BNBBTC"],
-                 "snapshot_depth": 10,
-                 "snapshot_base_url":"https://api.binance.com/api/v3/depth"
-            },
-            "bitstamp": {
-                "websocket_base_url": "wss://ws.bitstamp.net",
-                "symbols":["ETHBTC","LTCBTC","BNBBTC"],
-                "snapshot_base_url":"https://www.bitstamp.net/api/v2/order_book"
-            }
-        }   
-    }"#;
 
-    let snapshot_url = Url::parse("https://www.bitstamp.net/api/v2/order_book").unwrap();
-    let path = snapshot_url.path();
-    let mut ethbtc_snapshot = snapshot_url.clone();
-    ethbtc_snapshot.set_path(&format!("{}/{}", path, "ETHBTC"));
-    let mut ltcbtc_snapshot = snapshot_url.clone();
-    ltcbtc_snapshot.set_path(&format!("{}/{}", path, "LTCBTC"));
-    let mut bnbbtc_snapshot = snapshot_url.clone();
-    bnbbtc_snapshot.set_path(&format!("{}/{}", path, "BNBBTC"));
-
-    let websocket_url = Url::parse("wss://ws.bitstamp.net").unwrap();
-
-    let mut websocket_payloads: HashMap<String, Message> = HashMap::new();
-    let payload_message = "{\"event\": \"bts:subscribe\", \"data\": { \"channel\": \"order_book_XXXX\" } }";
-
-    websocket_payloads.insert("ETHBTC".to_string(), Message::Text(payload_message.replace("\"order_book_XXXX\"", "\"order_book_ETHBTC\"")));
-    websocket_payloads.insert("LTCBTC".to_string(), Message::Text(payload_message.replace("\"order_book_XXXX\"", "\"order_book_LTCBTC\"")));
-    websocket_payloads.insert("BNBBTC".to_string(), Message::Text(payload_message.replace("\"order_book_XXXX\"", "\"order_book_BNBBTC\"")));
-
-    let mut snapshot_hashmap: HashMap<String, Url> = HashMap::new();
-    snapshot_hashmap.insert("ETHBTC".to_string(), ethbtc_snapshot);
-    snapshot_hashmap.insert("LTCBTC".to_string(), ltcbtc_snapshot);
-    snapshot_hashmap.insert("BNBBTC".to_string(), bnbbtc_snapshot);
-    
-
-    let expected =  BitstampConfig{
-        websocket_url: websocket_url,
-        websocket_payloads: websocket_payloads,
-        snapshot_urls: snapshot_hashmap,
-        symbols: vec!["ETHBTC".to_string(), "LTCBTC".to_string(), "BNBBTC".to_string()]
-    };
-
-    let result= BitstampConfig::new(data.to_string()).unwrap();
-    assert_eq!(expected, result);
-}
 
 #[test]
 fn deserialize_stream_bitstamp_test(){

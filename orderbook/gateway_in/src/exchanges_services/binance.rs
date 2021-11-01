@@ -1,7 +1,5 @@
 
-use std::{
-    collections::{BTreeMap, HashMap}
-};
+use std::collections::BTreeMap;
 use anyhow::{Context, Result};
 use futures_util::StreamExt;
 use url::Url;
@@ -10,65 +8,13 @@ use tokio_tungstenite::{
     tungstenite::protocol::Message,
 };
 use tokio::sync::{broadcast, mpsc};
-use serde::{Deserialize, Deserializer};
+
 use async_trait::async_trait;
 use common::*;
 use crate::*;
 use crate::settings::DeserializeSettings;
 use crate::exchanges_services::*;
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BinanceConfig{
-    pub websocket_rate_ms: u32,
-    pub snapshot_urls: HashMap<Symbol, Url>,
-    pub websocket_urls: HashMap<Symbol, Url>,
-    pub snapshot_depth: u32,
-    pub symbols: Vec<String>
-}
-impl BinanceConfig {
-    pub fn new(json_str: String) -> Result<Self>{
-        
-        let config: BinanceConfig = serde_json::from_str(&json_str)
-            .context("JSON was not well-formatted config binance")?;
 
-        Ok(config)
-    } 
-}
-impl<'de> Deserialize<'de> for BinanceConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let outter_config: OutterConfig = Deserialize::deserialize(deserializer)?;
-        // do better hex decoding than this
-        let binance_config = outter_config.exchanges.binance;
-
-        let mut snapshot_hashmap: HashMap<Symbol, Url> = HashMap::new();
-        let mut symbol_websocket_url_hashmap: HashMap<Symbol, Url> = HashMap::new();
-
-        for symbol in binance_config.symbols.iter(){
-            let symbol_lower_case = symbol.to_lowercase();
-            let mut symbol_snapshot_url = binance_config.snapshot_base_url.clone();
-            symbol_snapshot_url.set_query(Some(&format!("symbol={}&limit={}", symbol, binance_config.snapshot_depth)));
-            snapshot_hashmap.insert(symbol.clone(), symbol_snapshot_url);
-
-            let mut symbol_websocket_url = binance_config.websocket_base_url.clone();
-            symbol_websocket_url.set_path(&format!("/ws/{}@depth@{}ms", symbol_lower_case.clone(), &binance_config.websocket_rate_ms));
-            symbol_websocket_url_hashmap.insert(symbol.clone(), symbol_websocket_url); 
-        }
-
-        let config = BinanceConfig{
-            websocket_urls: symbol_websocket_url_hashmap,
-            websocket_rate_ms: binance_config.websocket_rate_ms,
-            snapshot_urls: snapshot_hashmap,
-            snapshot_depth: binance_config.snapshot_depth,
-            symbols: binance_config.symbols
-
-        };
-
-        Ok(config)
-
-    }
-}
 pub struct BinanceService{
     pub config: BinanceConfig
 }

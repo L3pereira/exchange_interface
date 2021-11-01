@@ -10,15 +10,25 @@
  
 
 //! This crate provides common types for gateway_in crates and order_book_server
+pub mod binance_config_utils;
+pub mod bitstamp_config_utils;
+#[cfg(test)]
+mod tests;
 
-use std::fmt;
 use std::{
     str::FromStr,
-    collections::BTreeMap
+    collections::BTreeMap,
+    io::Read,
+    fmt,
+    fs::File
 };
-use anyhow::Result;
+use url::Url;
+use anyhow::{Context, Result};
 use rust_decimal::Decimal;
+use serde::{Deserialize, Deserializer, de::Error};
 
+pub use binance_config_utils::*;
+pub use bitstamp_config_utils::*;
 
 
 /// ErrCode
@@ -103,3 +113,61 @@ pub struct SnapshotData {
 
 }
 
+
+#[derive(Deserialize)]
+#[derive(Clone, Debug)]
+pub struct ExchangesConfig {
+    pub binance: BinanceConfig,
+    pub bitstamp: BitstampConfig,
+    pub grpc_server: String,
+    pub web_server: String,
+    pub client_websocket: String,
+}
+
+
+fn to_url<'de, D>(deserializer: D) -> Result<Url, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+    Url::parse(s).map_err(D::Error::custom)
+}
+
+fn to_upper_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s: Vec<String> = Deserialize::deserialize(deserializer)?;
+    Ok(s.into_iter().map(|x| x.to_uppercase()).collect())
+}
+
+pub fn setup_config(path: &str) -> Result<ExchangesConfig> {
+    // let task_name = "--setup_config--";
+    let mut file = File::open(path)?;
+    // let mut file = match File::open(path){
+    //     Ok(file) => file,
+    //     Err(err) => {
+    //         log::error!("Error in {:?}\nFile open:\n{:?}", task_name, err);
+    //         panic!("Error in {:?}\nFile open:\n{:?}", task_name, err)
+    //     }
+    // };
+    let mut buff = String::new(); 
+    file.read_to_string(&mut buff)?;
+    // if let Err(err) = file.read_to_string(&mut buff){
+    //     log::error!("Error in {:?}\nFile Read To String :\n{:?}", task_name, err);
+    //     panic!("Error in {:?}\nFile Read To String :\n{:?}", task_name, err)
+
+    // };
+
+    // let config = match WebAppConfig::new(buff){
+    //     Ok(config) => config,
+    //     Err(err) => {
+    //         log::error!("Error in {:?}\nDeserialize config :\n{:?}", task_name, err);
+    //         panic!("Error in {:?}\nDeserialize config :\n{:?}", task_name, err);
+    //     }
+    // };
+    let config: ExchangesConfig = serde_json::from_str(&buff)
+        .context("JSON was not well-formatted config binance")?;
+
+    Ok(config)
+}
