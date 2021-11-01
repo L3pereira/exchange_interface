@@ -1,6 +1,6 @@
 pub mod binance;
 pub mod bitstamp;
-use serde::{Serialize, Deserialize, de::Error, Deserializer};
+use serde::{Serialize, Deserialize};
 use url::Url;
 use common::*;
 use anyhow::Result;
@@ -9,69 +9,7 @@ use crate::settings::DeserializeSettings;
 use rust_decimal::Decimal;
 use tokio::sync::broadcast::{Sender, Receiver};
 ////////////////////////////////////////////////////////////////////////////////////////
-#[derive(Deserialize)]
-#[derive(Clone, Debug)]
-struct OutterConfig {
-    pub exchanges: ExchangesConfig,
-}
 
-#[derive(Deserialize)]
-#[derive(Clone, Debug)]
-struct ExchangesConfig {
-    pub binance: BinanceConfiguration,
-    pub bitstamp: BitstampConfiguration
-}
-
-#[derive(Deserialize)]
-#[derive(Clone, Debug)]
-struct BinanceConfiguration {
-
-    #[serde(deserialize_with = "to_url")]
-    websocket_base_url: Url,
-
-    #[serde(deserialize_with = "to_url")]
-    snapshot_base_url: Url,
-
-    #[serde(deserialize_with = "to_upper_vec")]
-    symbols: Vec<String>,
-
-    websocket_rate_ms: u32,
-
-    snapshot_depth: u32,
-
-}
-
-#[derive(Deserialize)]
-#[derive(Clone, Debug)]
-struct BitstampConfiguration {
-    #[serde(deserialize_with = "to_url")]
-    websocket_base_url: Url,
-
-    #[serde(deserialize_with = "to_url")]
-    snapshot_base_url: Url,
-
-    // #[serde(deserialize_with = "to_upper_vec")]
-    symbols: Vec<String>,
-
-}
-
-fn to_url<'de, D>(deserializer: D) -> Result<Url, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: &str = Deserialize::deserialize(deserializer)?;
-    Url::parse(s).map_err(D::Error::custom)
-}
-
-fn to_upper_vec<'de, D>(deserializer: D) -> Result<Vec<String>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s: Vec<String> = Deserialize::deserialize(deserializer)?;
-    Ok(s.into_iter().map(|x| x.to_uppercase()).collect())
-}
-
-////////////////////////////////////////////////////////////////////////////////////////
 #[derive(Serialize, Deserialize)]
 struct OuterBinance {
     #[serde(alias = "s")]

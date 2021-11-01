@@ -1,0 +1,19 @@
+#rates {
+    color: rgb(255, 255, 255);
+  }
+.bids {
+    background-color: rgb(9, 53, 11);
+}
+.asks {
+  background-color: rgb(116, 5, 5);
+}
+.spread {
+  background-color: rgb(196, 158, 8);
+}
+body {
+  background-color: rgb(16, 21, 17);
+}
+
+h1 {
+  color: rgb(202, 201, 201);
+}

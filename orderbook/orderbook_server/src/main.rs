@@ -15,23 +15,20 @@ mod aggregated_order_book;
 #[cfg(test)]
 mod tests;
 
-use serde_json::Value;
+
 use anyhow::Result;
-use std::fs::File;
-use std::io::{Read, Error, ErrorKind};
+use std::io::{ Error, ErrorKind};
 use tokio::sync::{broadcast, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
-use serde::Deserialize;
+use lazy_static::lazy_static;
 use common::*;
-use gateway_in::{
-    exchanges_services::{binance::*, bitstamp::*, ExchangeInit}
-};
+use gateway_in::exchanges_services::{binance::*, bitstamp::*, ExchangeInit};
 use crate::aggregated_order_book::AggregatedBook;
-use tonic::{transport::Server, Request, Response, Status, Code};
+use tonic::{transport::Server, Request, Response, Status};
 use orderbook::orderbook_aggregator_server::{OrderbookAggregator, OrderbookAggregatorServer};
 use orderbook::{Summary, Level ,Empty};
 
-const CONFIG_PATH: &str = "config.json"; 
+const CONFIG_PATH: &str = "../config.json"; 
 const LOG_CONFIG_PATH: &str = "log_config.yaml";
 
 use std::sync::Once;
@@ -42,6 +39,15 @@ pub fn setup_log() -> () {
     });
 }
 
+lazy_static! {
+    static ref CONFIG: ExchangesConfig = match setup_config(CONFIG_PATH){
+        Ok(config) => config,
+        Err(err) => {
+            log::error!("\n{:?}", err);
+            panic!("\n{:?}", err);
+        }
+    };   
+}
 
 fn init( mut service: (impl ExchangeInit + 'static + Send), output_stream_tx_ch: broadcast::Sender<SnapshotData>)  {
     tokio::spawn(async move {service.stream_init_task(output_stream_tx_ch).await});
@@ -88,31 +94,10 @@ impl OrderbookAggregator for OrderbookService {
     type BookSummaryStream = ReceiverStream<Result<Summary, Status>>;
 // implementation for rpc call
     async fn book_summary(&self, _: Request<Empty>) -> Result<Response<Self::BookSummaryStream>, Status> {
-        let task_name = "--book_summary Task--";
-        let mut file = File::open(CONFIG_PATH).map_err(|err| {   
-                log::error!("Error in {:?}\nFile open:\n{:?}", task_name, err);
-                Status::new(Code::Internal, "config error")}
-        )?;
+        // let task_name = "--book_summary Task--";
 
-        let mut buff = String::new(); 
-
-        file.read_to_string(&mut buff).map_err(|err| {   
-            log::error!("Error in {:?}\nread_to_string:\n{:?}", task_name, err);
-            Status::new(Code::Internal, "config error")}
-        )?;
-
-        let binance_config = BinanceConfig::new(buff.clone()).map_err(|err| {   
-            log::error!("Error in {:?}\nbinance_config:\n{:?}", task_name, err);
-            Status::new(Code::Internal, "config error")}
-        )?;
-
-        let bitstamp_config = BitstampConfig::new(buff.clone()).map_err(|err| {   
-            log::error!("Error in {:?}\nbitstamp_config:\n{:?}", task_name, err);
-            Status::new(Code::Internal, "config error")}
-        )?;
-
-        let binance_service = BinanceService::new(binance_config);
-        let bitstamp_service = BitstampService::new(bitstamp_config);
+        let binance_service = BinanceService::new(CONFIG.binance.clone());
+        let bitstamp_service = BitstampService::new(CONFIG.bitstamp.clone());
 
         let (tx, rx) = mpsc::channel(4);
         let (binance_output_tx_ch, mut binance_output_rx_ch) =  broadcast::channel(10);
@@ -146,7 +131,7 @@ impl OrderbookAggregator for OrderbookService {
                                 agrregate_book_result.update_book(snap_shot);
                                 match set_response_stream(&mut agrregate_book_result){
                                     Ok(response) =>{let _ = tx.send(Ok(response)).await;},
-                                    Err(err) => log::error!("\nError in Bitstamp  :\n {:?}", err)
+                                    Err(err) => log::error!("\nError in Binance  :\n {:?}", err)
                                 };
                             },
                             Err(err)=> {log::error!("\nError in Binance  :\n {:?}", err); return}        
@@ -162,26 +147,12 @@ impl OrderbookAggregator for OrderbookService {
     }
 }
 
-#[derive(Deserialize)]
-struct Config{
-    pub server: String,
-}
 
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<()> 
 {
     // setup_log();
-
-    let mut file = File::open(CONFIG_PATH)?;
-    let mut buff = String::new(); 
-    file.read_to_string(&mut buff)?;
-    let value: Value = serde_json::from_str(&buff)?;
-
-    let addr_str: &str = match &value["server"]{
-        Value::String(content) => content,
-        _ => ""
-    };
-    let addr = addr_str.parse()?;
+    let addr = CONFIG.grpc_server.parse()?;
 
     // creating a service
     let orderbook_service = OrderbookService::default();

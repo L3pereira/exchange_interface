@@ -4,6 +4,5 @@ members = [
     "common",
     "gateway_in",
     "orderbook_server", 
-    "orderbook_client",
     "webserver"
 ]
