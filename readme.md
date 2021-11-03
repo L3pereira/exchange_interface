@@ -6,6 +6,7 @@
 <h2>Tech Stack</h2>
 
 <ul>
+  <li>Async (Tokio Runtime)</li>
   <li>Websockets</li>
   <li>GRPC</li>
   <li>Actix</li>
