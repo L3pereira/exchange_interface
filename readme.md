@@ -2,6 +2,15 @@
 
 ![ScreenShot](orderbook.JPG)
 
+
+<h2>Tech Stack</h2>
+
+<ul>
+  <li>Websockets</li>
+  <li>GRPC</li>
+  <li>Actix</li>
+  <li>React</li>
+</ul>  
 Backend is built with rustc 1.53.0 (53cb7b09b 2021-06-17);<br/>
 Change the config.json
 
